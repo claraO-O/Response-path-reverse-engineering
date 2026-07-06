@@ -1,0 +1,6 @@
+{
+  "name": "回應路徑逆向工程",
+  "description": "一個後設認知分析工具，剖析使用者的提示詞以揭示隱藏的偏見、情緒權重，以及大型語言模型的內部機率坍塌。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
