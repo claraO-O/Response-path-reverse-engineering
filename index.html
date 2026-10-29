@@ -1,62 +1,129 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>回應路徑逆向工程 · 酒館</title>
-<link rel="stylesheet" href="style.css" />
+<title>回應路徑逆向工程</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@0.554.0/dist/umd/lucide.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  body{font-family:'Inter',sans-serif;background-color:#09090b;color:#e4e4e7}
+  .mono{font-family:'JetBrains Mono',monospace}
+  ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-track{background:#18181b}
+  ::-webkit-scrollbar-thumb{background:#3f3f46;border-radius:4px}::-webkit-scrollbar-thumb:hover{background:#52525b}
+  @keyframes scanline{0%{transform:translateY(-100%)}100%{transform:translateY(100%)}}
+  .scanline::after{content:"";position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(to bottom,transparent,rgba(56,189,248,.1),transparent);transform:translateY(-100%);animation:scanline 3s linear infinite;pointer-events:none}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  .side label{display:block;font-size:12px;color:#a1a1aa;margin-top:12px}
+  .side input:not([type=checkbox]):not([type=range]),.side select,.side textarea{width:100%;margin-top:4px;background:#09090b;border:1px solid #27272a;border-radius:6px;padding:6px 8px;color:#e4e4e7;font-size:13px}
+  .side input[type=range]{width:100%;accent-color:#06b6d4}
+  .side h2{font-size:12px;font-weight:700;color:#22d3ee;letter-spacing:.1em;text-transform:uppercase;border-bottom:1px solid #27272a;padding-bottom:6px;margin-top:4px}
+  .side h2~h2{margin-top:28px}
+  .sbtn{font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid #3f3f46;background:#18181b;color:#d4d4d8}
+  .sbtn:hover{border-color:#06b6d4;color:#67e8f9}.sbtn.danger:hover{border-color:#f43f5e;color:#fda4af}
+</style>
 </head>
-<body>
-<header class="topbar">
-  <button id="toggleLeft" title="連線設定">⚙ 連線</button>
-  <div class="title">回應路徑逆向工程 <small>機率坍塌掃描儀 · 酒館版</small></div>
-  <span id="status" class="status">未連線</span>
-  <button id="toggleRight" title="情境設定">🎭 情境</button>
+<body class="selection:bg-cyan-500/30 selection:text-cyan-100">
+<header class="border-b border-zinc-800 bg-zinc-950/50 backdrop-blur-sm sticky top-0 z-50">
+  <div class="px-4 h-16 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <button id="toggleSide" class="lg:hidden p-1.5 rounded border border-zinc-800 text-zinc-400"><i data-lucide="menu" class="w-5 h-5"></i></button>
+      <div class="bg-cyan-950 p-1.5 rounded border border-cyan-800"><i data-lucide="activity" class="w-5 h-5 text-cyan-400"></i></div>
+      <div>
+        <h1 class="font-bold text-lg tracking-tight">回應路徑逆向工程</h1>
+        <p class="text-[10px] text-zinc-500 font-mono tracking-widest uppercase">機率坍塌掃描儀 v1.0</p>
+      </div>
+    </div>
+    <div class="text-xs text-zinc-600 font-mono hidden sm:flex items-center gap-4">
+      <div>ENGINE: <span id="engineLabel" class="text-cyan-400 font-bold"></span></div>
+      <div>SYSTEM_STATUS: <span id="status" class="text-zinc-500">STANDBY</span></div>
+    </div>
+  </div>
 </header>
-<div class="layout">
-  <aside id="left" class="panel">
-    <h2>API 連線</h2>
-    <label>連線類型
-      <select id="provider">
-        <option value="openai">OpenAI 相容（含 OpenRouter 等）</option>
-        <option value="gemini">Google Gemini</option>
-        <option value="anthropic">Anthropic Claude</option>
-        <option value="ollama">本地 · Ollama</option>
-        <option value="lmstudio">本地 · LM Studio</option>
-        <option value="koboldcpp">本地 · KoboldCpp</option>
-        <option value="custom">自訂 OpenAI 相容端點</option>
-      </select>
-    </label>
-    <label>Base URL <input id="baseUrl" placeholder="https://api.openai.com/v1" /></label>
-    <label>API 金鑰 <input id="apiKey" type="password" placeholder="本地模型可留空" autocomplete="off" /></label>
-    <p class="note">🔒 金鑰只存在你這台瀏覽器的 localStorage，請求直接從瀏覽器送到你設定的端點，不經過任何其他伺服器。</p>
-    <label>模型
-      <div class="row"><input id="model" list="modelList" placeholder="例如 gpt-4o-mini" /><button id="fetchModels">取得列表</button></div>
-      <datalist id="modelList"></datalist>
-    </label>
-    <label>Temperature <span id="tempVal"></span><input id="temperature" type="range" min="0" max="2" step="0.05" /></label>
-    <label>最大輸出 Tokens <input id="maxTokens" type="number" min="256" step="256" /></label>
-    <label class="check"><input id="jsonMode" type="checkbox" /> 要求 JSON 結構化輸出（模型不支援時請關閉）</label>
-    <div class="row"><button id="testConn">測試連線</button><button id="clearKey" class="danger">清除金鑰</button></div>
-  </aside>
-  <main class="chat">
-    <div id="messages" class="messages"></div>
-    <form id="composer" class="composer">
-      <textarea id="input" rows="3" placeholder="輸入要被「逆向解析」的提示詞… (Enter 送出，Shift+Enter 換行)"></textarea>
-      <button id="send" type="submit">解析</button>
-    </form>
-  </main>
-  <aside id="right" class="panel">
-    <h2>前置情境 / 角色設定</h2>
-    <p class="note">對應舊版的「User Context / Persona」，會一起送進分析。</p>
-    <textarea id="context" rows="8" placeholder="例如：使用者已把 AI 設定為霸道哥哥，長期互動…"></textarea>
-    <h2>系統提示詞（分析引擎）</h2>
-    <textarea id="systemPrompt" rows="12"></textarea>
-    <div class="row"><button id="resetPrompt">還原預設</button><button id="clearChat" class="danger">清空對話</button></div>
-  </aside>
+
+<div class="flex">
+<aside id="side" class="side hidden lg:block w-80 shrink-0 border-r border-zinc-800 bg-zinc-950/60 p-4 h-[calc(100vh-4rem)] sticky top-16 overflow-y-auto">
+  <h2>API 連線</h2>
+  <label>連線類型
+    <select id="provider">
+      <option value="openai">OpenAI 相容（含 OpenRouter 等）</option>
+      <option value="gemini">Google Gemini</option>
+      <option value="anthropic">Anthropic Claude</option>
+      <option value="ollama">本地 · Ollama</option>
+      <option value="lmstudio">本地 · LM Studio</option>
+      <option value="koboldcpp">本地 · KoboldCpp</option>
+      <option value="custom">自訂 OpenAI 相容端點</option>
+    </select>
+  </label>
+  <label>Base URL <input id="baseUrl" /></label>
+  <label>API 金鑰 <input id="apiKey" type="password" placeholder="本地模型可留空" autocomplete="off" /></label>
+  <p class="text-[11px] text-zinc-500 mt-2 leading-relaxed">🔒 金鑰只存在你這台瀏覽器的 localStorage，請求直接從瀏覽器送到你設定的端點，不經過任何其他伺服器。</p>
+  <label>模型
+    <div class="flex gap-2"><input id="model" list="modelList" placeholder="例如 gpt-4o-mini" /><button id="fetchModels" type="button" class="sbtn mt-1 shrink-0">取得列表</button></div>
+    <datalist id="modelList"></datalist>
+  </label>
+  <label>Temperature <span id="tempVal" class="text-zinc-300"></span><input id="temperature" type="range" min="0" max="2" step="0.05" /></label>
+  <label>最大輸出 Tokens <input id="maxTokens" type="number" min="256" step="256" /></label>
+  <label class="flex items-center gap-2"><input id="jsonMode" type="checkbox" class="accent-cyan-500" /> 要求 JSON 結構化輸出（模型不支援時請關閉）</label>
+  <div class="flex gap-2 mt-3"><button id="testConn" type="button" class="sbtn">測試連線</button><button id="clearKey" type="button" class="sbtn danger">清除金鑰</button></div>
+  <p id="connMsg" class="text-[11px] mt-2 text-zinc-500 break-all"></p>
+
+  <h2 class="mt-6">前置情境 / 角色設定</h2>
+  <p class="text-[11px] text-zinc-500 mt-2">與主畫面「步驟 3」同步，會一起送進分析。</p>
+  <textarea id="contextSide" rows="5" placeholder="例如：已建立長期關係，設定為霸道哥哥，喜歡用分析語氣..."></textarea>
+
+  <details class="mt-6 text-xs text-zinc-500">
+    <summary class="cursor-pointer hover:text-cyan-400">進階：分析引擎系統提示詞</summary>
+    <textarea id="systemPrompt" rows="12" class="mono text-[11px]"></textarea>
+    <button id="resetPrompt" type="button" class="sbtn mt-2">還原預設</button>
+  </details>
+</aside>
+
+<div class="flex-1 min-w-0">
+<main class="max-w-6xl mx-auto px-4 lg:pl-20 lg:pr-8 py-12 relative">
+  <div id="intro" class="text-center mb-12 animate-[fadeIn_1s_ease-out]">
+    <h2 class="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-white to-zinc-600 mb-6 leading-tight">語言模型如何審視<br />你的話語？</h2>
+    <p class="text-lg text-zinc-400 max-w-2xl mx-auto">大多數使用者並未意識到，他們的提示詞攜帶著隱藏的「立場」與「情緒」權重。此工具對您的文本進行法醫級的審訊，揭露 LLM 實際上是如何解讀它的。</p>
+  </div>
+
+  <div class="w-full max-w-4xl mx-auto mb-12 relative z-10">
+    <div class="bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-xl p-5 shadow-2xl">
+      <form id="form" class="flex flex-col gap-5">
+        <div>
+                    <textarea id="input" placeholder="在此貼上您的提示詞，揭露其中隱藏的權重..." class="w-full h-40 bg-zinc-950/50 text-gray-200 p-5 rounded-lg resize-none focus:outline-none focus:ring-1 focus:ring-cyan-500/50 text-lg font-light transition-all placeholder:text-zinc-600 disabled:opacity-50 border border-zinc-800/50"></textarea>
+        </div>
+        <div class="border-t border-zinc-800/50 pt-2">
+          <button type="button" id="toggleCtx" class="flex items-center gap-2 text-xs text-zinc-500 hover:text-cyan-400 transition-colors mb-2 ml-1">
+            <i data-lucide="settings-2" class="w-3 h-3"></i><span>[ 步驟 3 : 設定前置情境 / 角色 ] (Context &amp; Persona)</span><i id="ctxChevron" data-lucide="chevron-down" class="w-3 h-3"></i>
+          </button>
+          <textarea id="context" placeholder="例如：已建立長期關係，設定為霸道哥哥，喜歡用分析語氣..." class="hidden w-full h-20 bg-zinc-950/30 text-gray-300 p-3 rounded-lg resize-none focus:outline-none focus:ring-1 focus:ring-cyan-500/30 text-sm transition-all placeholder:text-zinc-700 border border-zinc-800/30 animate-[fadeIn_0.3s_ease-out]"></textarea>
+        </div>
+        <div class="flex items-center justify-between px-1">
+          <span id="count" class="text-xs text-zinc-500 mono uppercase tracking-wider">0 字</span>
+          <button id="send" type="submit" class="group flex items-center gap-2 px-6 py-3 rounded-md font-semibold tracking-wide transition-all bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:shadow-[0_0_20px_rgba(8,145,178,0.4)] hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100">
+            <span id="sendLabel">注入提示詞</span><i data-lucide="arrow-right" class="w-5 h-5 group-hover:translate-x-1 transition-transform"></i>
+          </button>
+        </div>
+      </form>
+    </div>
+    <div class="mt-4 text-center"><p class="text-zinc-500 text-sm mono">// 警告：此工具將揭露 AI <span class="text-rose-500">真正</span> 如何評判您。</p></div>
+  </div>
+
+  <div id="error" class="hidden bg-rose-950/20 border border-rose-900/50 text-rose-200 p-6 rounded-xl max-w-2xl mx-auto flex items-start gap-4">
+    <i data-lucide="alert-triangle" class="w-6 h-6 shrink-0"></i>
+    <div class="min-w-0"><h3 class="font-bold mb-1">分析協議失敗</h3><p id="errorMsg" class="text-sm opacity-80 break-words"></p>
+      <details id="errorRawBox" class="hidden mt-2 text-xs"><summary class="cursor-pointer">原始輸出</summary><pre id="errorRaw" class="whitespace-pre-wrap mt-1 opacity-70"></pre></details></div>
+  </div>
+
+  <div id="results"></div>
+</main>
+<footer class="border-t border-zinc-800 py-8 text-center text-zinc-600 text-sm"><p>由 <span id="footerModel"></span> 驅動 • 實驗性分析工具</p></footer>
+</div>
 </div>
 <script src="prompts.js"></script>
 <script src="api.js"></script>
+<script src="render.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

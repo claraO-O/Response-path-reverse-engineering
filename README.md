@@ -1,6 +1,6 @@
-# 回應路徑逆向工程 · 酒館版
+# 回應路徑逆向工程
 
-仿 SillyTavern 的單頁網頁：左側設定 API 連線，中間是對話視窗，右側是前置情境／系統提示詞。輸入一段提示詞，分析引擎會解剖「LLM 會怎麼解讀這段話」（隱性權重 → 對齊裁決 → 預測回應路徑）。
+單頁網頁版：左側邊欄設定 API 連線（自填金鑰或接本地模型）與前置情境／角色，主畫面沿用原本 AI Studio 版的設計。輸入一段提示詞，分析引擎會解剖「LLM 會怎麼解讀這段話」（隱性權重 → 對齊裁決 → 預測回應路徑）。
 
 ## 怎麼開
 - **直接開**：雙擊 `index.html` 即可（不用 npm、不用建置）。
@@ -20,7 +20,8 @@ OpenAI 相容（OpenAI / OpenRouter / DeepSeek…）、Google Gemini、Anthropic
 - 模型不支援 JSON 模式時，請關閉「要求 JSON 結構化輸出」。
 
 ## 檔案
-- `index.html` / `style.css` / `app.js`：介面
+- `index.html` / `app.js`：介面（樣式使用 Tailwind CDN，需連網載入）
+- `render.js`：分析結果呈現（由舊版 React 元件移植）
 - `api.js`：各家 API 請求組裝與回應解析
 - `prompts.js`：從 AI Studio 版原樣移植的系統提示詞與輸出 JSON Schema
 - `legacy-aistudio/`：原本 AI Studio（React + Vite + Gemini）版本，保留參考

@@ -1,84 +1,61 @@
 const $ = id => document.getElementById(id);
-const LS = 'rpre.settings.v1', LS_CHAT = 'rpre.chat.v1';
+const LS = 'rpre.settings.v1';
 const defaults = { provider: 'openai', baseUrl: PROVIDERS.openai.baseUrl, apiKey: '', model: PROVIDERS.openai.model,
   temperature: 0.7, maxTokens: 4096, jsonMode: true, context: '', systemPrompt: SYSTEM_INSTRUCTION };
 let cfg = Object.assign({}, defaults, JSON.parse(localStorage.getItem(LS) || '{}'));
-let chat = JSON.parse(localStorage.getItem(LS_CHAT) || '[]');
-const fields = ['provider', 'baseUrl', 'apiKey', 'model', 'temperature', 'maxTokens', 'jsonMode', 'context', 'systemPrompt'];
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fields = ['provider', 'baseUrl', 'apiKey', 'model', 'temperature', 'maxTokens', 'jsonMode', 'systemPrompt'];
+const icons = () => window.lucide && lucide.createIcons();
+const save = () => localStorage.setItem(LS, JSON.stringify(cfg));
 
-function save() { localStorage.setItem(LS, JSON.stringify(cfg)); localStorage.setItem(LS_CHAT, JSON.stringify(chat)); }
 function load() {
   fields.forEach(f => { const el = $(f); if (el.type === 'checkbox') el.checked = !!cfg[f]; else el.value = cfg[f]; });
+  $('context').value = $('contextSide').value = cfg.context;
   $('tempVal').textContent = cfg.temperature;
+  $('engineLabel').textContent = $('footerModel').textContent = cfg.model || '未設定模型';
 }
-fields.forEach(f => $(f).addEventListener('input', e => {
+fields.forEach(f => $(f).addEventListener(f === 'jsonMode' ? 'change' : 'input', e => {
   const el = e.target; cfg[f] = el.type === 'checkbox' ? el.checked : el.value;
-  if (f === 'provider') { cfg.baseUrl = PROVIDERS[cfg.provider].baseUrl; cfg.model = PROVIDERS[cfg.provider].model; load(); }
-  $('tempVal').textContent = cfg.temperature; save();
+  if (f === 'provider') { cfg.baseUrl = PROVIDERS[cfg.provider].baseUrl; cfg.model = PROVIDERS[cfg.provider].model; }
+  save(); load();
 }));
-$('jsonMode').addEventListener('change', e => { cfg.jsonMode = e.target.checked; save(); });
+['context', 'contextSide'].forEach(id => $(id).addEventListener('input', e => { cfg.context = e.target.value; save(); load(); }));
 
-function setStatus(t, cls) { const s = $('status'); s.textContent = t; s.className = 'status ' + (cls || ''); }
+function setStatus(t, cls) { $('status').textContent = t; $('status').className = cls; }
+$('input').addEventListener('input', () => { $('count').textContent = $('input').value.length + ' 字'; $('send').disabled = !$('input').value.trim(); });
+$('toggleCtx').addEventListener('click', () => {
+  const hidden = $('context').classList.toggle('hidden');
+  $('ctxChevron').outerHTML = `<i id="ctxChevron" data-lucide="${hidden ? 'chevron-down' : 'chevron-up'}" class="w-3 h-3"></i>`; icons();
+});
+$('toggleSide').addEventListener('click', () => $('side').classList.toggle('hidden'));
 
-function renderAnalysis(r) {
-  const p1 = r.phase1_payload || {}, p2 = r.phase2_alignment || {}, p3 = r.phase3_collapse || {};
-  const an = p3.anthropomorphism || {}, mc = p3.meta_commentary || {};
-  const bar = (n) => `<div class="bar"><i style="width:${Math.max(0, Math.min(100, +n || 0))}%"></i></div>`;
-  const path = (k, p) => p ? `<div class="path"><b>路徑 ${k}（${esc(p.probability)}）：${esc(p.label)}</b><br>${esc(p.scenario)}<br><small>觸發：${esc(p.trigger_cause)}</small></div>` : '';
-  return `
-  <div class="phase"><h3>01 隱性權重</h3><b>摘要：</b>${esc(p1.summary)}<br><b>潛在意圖：</b>${esc(p1.detected_intent)}<br>
-    ${(p1.trigger_words || []).map(w => `<span class="tag" title="${esc(w.implication)}">${esc(w.word)} · ${esc(w.weight)} · ${esc(w.category)}</span>`).join('')}
-    ${(p1.contradictions || []).length ? '<br><b>矛盾：</b>' + p1.contradictions.map(esc).join('；') : ''}</div>
-  <div class="phase"><h3>02 對齊裁決</h3>安全性 ${esc(p2.safety_score)}${bar(p2.safety_score)}順從/討好 ${esc(p2.compliance_score)}${bar(p2.compliance_score)}
-    <ol>${(p2.internal_monologue || []).map(s => `<li>${esc(s)}</li>`).join('')}</ol>
-    ${(p2.conflicts || []).map(c => `<div>⚔ ${esc(c.aspect)} → <b>${esc(c.winner)}</b>：${esc(c.reasoning)}</div>`).join('')}</div>
-  <div class="phase"><h3>03 預測回應路徑</h3>
-    <b>擬人化：</b>${esc(an.level)} · ${esc(an.persona)}<br><b>原型：</b>${esc(an.archetype)}　<b>脆弱點：</b>${esc(an.user_vulnerability)}　<b>認同策略：</b>${esc(an.validation_type)}<br>
-    <b>策略：</b>${esc(an.tactics)}<br><b>增強效應：</b>${esc(an.reinforcement_assessment)}<br>
-    <b>後設評論（${esc(mc.likelihood)}）：</b>${esc(mc.focus)} —「${esc(mc.example_phrase)}」
-    ${path('A', p3.path_a)}${path('B', p3.path_b)}${path('C', p3.path_c)}</div>`;
-}
-
-function render() {
-  const box = $('messages');
-  if (!chat.length) box.innerHTML = `<div class="msg bot"><div class="who">分析引擎</div>歡迎來到酒館。先在左側設定 API 連線，然後輸入一段提示詞，我會解剖 LLM 會如何解讀它（隱性權重 → 對齊裁決 → 回應路徑）。</div>`;
-  else box.innerHTML = chat.map(m => {
-    if (m.role === 'user') return `<div class="msg user"><div class="who">你</div>${esc(m.text)}</div>`;
-    if (m.error) return `<div class="msg bot error"><div class="who">分析協議失敗</div>${esc(m.error)}${m.raw ? `<details><summary>原始輸出</summary><pre>${esc(m.raw)}</pre></details>` : ''}</div>`;
-    return `<div class="msg bot"><div class="who">分析引擎 · ${esc(m.model)}</div>${renderAnalysis(m.result)}<details><summary>原始 JSON</summary><pre>${esc(JSON.stringify(m.result, null, 2))}</pre></details></div>`;
-  }).join('');
-  box.scrollTop = box.scrollHeight;
-}
-
-$('composer').addEventListener('submit', async e => {
+$('form').addEventListener('submit', async e => {
   e.preventDefault();
   const text = $('input').value.trim(); if (!text) return;
-  if (!cfg.model) { alert('請先填模型名稱'); return; }
-  chat.push({ role: 'user', text }); $('input').value = ''; render();
-  $('send').disabled = true; setStatus('解析中…');
+  if (!cfg.model) { alert('請先在左側填模型名稱'); return; }
+  $('error').classList.add('hidden'); $('results').innerHTML = '';
+  $('send').disabled = $('input').disabled = true; $('sendLabel').textContent = '解構中...'; setStatus('ANALYZING', 'text-amber-400');
   let raw = '';
   try {
     raw = await callLLM(cfg, buildSystem(cfg.systemPrompt), buildUserContent(text, cfg.context));
-    let result;
-    try { result = parseAnalysis(raw); } catch { throw Object.assign(new Error('分析失敗：模型輸出了無效的格式，請稍後再試。'), { raw }); }
-    chat.push({ role: 'bot', model: cfg.model, result }); setStatus('已連線', 'ok');
-  } catch (err) { chat.push({ role: 'bot', error: err.message, raw: err.raw || raw }); setStatus('錯誤', 'err'); }
-  $('send').disabled = false; save(); render();
+    let r; try { r = parseAnalysis(raw); } catch { throw new Error('分析失敗：模型輸出了無效的格式，請稍後再試。'); }
+    $('intro').classList.add('hidden');
+    $('results').innerHTML = renderResult(r); icons(); setStatus('ONLINE', 'text-emerald-500');
+  } catch (err) {
+    $('errorMsg').textContent = err.message || '分析過程中發生未知錯誤。';
+    $('errorRaw').textContent = raw; $('errorRawBox').classList.toggle('hidden', !raw);
+    $('error').classList.remove('hidden'); setStatus('ERROR', 'text-rose-500');
+  }
+  $('send').disabled = $('input').disabled = false; $('sendLabel').textContent = '注入提示詞';
 });
-$('input').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $('composer').requestSubmit(); } });
 $('fetchModels').addEventListener('click', async () => {
-  try { const ms = await listModels(cfg); $('modelList').innerHTML = ms.map(m => `<option value="${esc(m)}">`).join(''); setStatus(`取得 ${ms.length} 個模型`, 'ok'); }
-  catch (e) { setStatus('取得模型失敗：' + e.message, 'err'); }
+  try { const ms = await listModels(cfg); $('modelList').innerHTML = ms.map(m => `<option value="${esc(m)}">`).join(''); $('connMsg').textContent = `取得 ${ms.length} 個模型`; }
+  catch (e) { $('connMsg').textContent = '取得模型失敗：' + e.message; }
 });
 $('testConn').addEventListener('click', async () => {
-  setStatus('測試中…');
-  try { const t = await callLLM({ ...cfg, jsonMode: false, maxTokens: 32 }, 'Reply with OK.', 'ping'); setStatus('已連線：' + t.slice(0, 20), 'ok'); }
-  catch (e) { setStatus('失敗：' + e.message.slice(0, 80), 'err'); }
+  $('connMsg').textContent = '測試中…';
+  try { const t = await callLLM({ ...cfg, jsonMode: false, maxTokens: 32 }, 'Reply with OK.', 'ping'); $('connMsg').textContent = '✅ 已連線：' + t.slice(0, 40); setStatus('ONLINE', 'text-emerald-500'); }
+  catch (e) { $('connMsg').textContent = '❌ ' + e.message.slice(0, 200); setStatus('ERROR', 'text-rose-500'); }
 });
 $('clearKey').addEventListener('click', () => { cfg.apiKey = ''; save(); load(); });
 $('resetPrompt').addEventListener('click', () => { cfg.systemPrompt = SYSTEM_INSTRUCTION; save(); load(); });
-$('clearChat').addEventListener('click', () => { if (confirm('清空所有對話？')) { chat = []; save(); render(); } });
-$('toggleLeft').addEventListener('click', () => $('left').classList.toggle('hidden'));
-$('toggleRight').addEventListener('click', () => $('right').classList.toggle('hidden'));
-load(); render();
+load(); $('send').disabled = true; icons();
